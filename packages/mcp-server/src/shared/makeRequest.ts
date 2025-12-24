@@ -1,5 +1,6 @@
 import { ErrorCode, McpError } from "@modelcontextprotocol/sdk/types.js";
 import { type, type Type } from "arktype";
+import { resolve } from "path";
 import { logger } from "./logger";
 
 // Default to HTTPS port, fallback to HTTP if specified
@@ -72,4 +73,51 @@ export async function makeRequest<
   }
 
   return validated;
+}
+
+// Cache vault path to avoid repeated API calls
+let cachedVaultPath: string | null = null;
+let detectedManifestDir: string | null = null;
+
+/**
+ * Gets the vault path, either from environment variable or by auto-detecting
+ * from the Obsidian API's manifest.dir field.
+ */
+export async function getVaultPath(): Promise<string | null> {
+  if (cachedVaultPath) return cachedVaultPath;
+
+  // Check environment variable first (preferred method)
+  if (process.env.OBSIDIAN_VAULT_PATH) {
+    cachedVaultPath = process.env.OBSIDIAN_VAULT_PATH;
+    return cachedVaultPath;
+  }
+
+  // Auto-detect from API status
+  const API_KEY = process.env.OBSIDIAN_API_KEY;
+  if (!API_KEY) return null;
+
+  try {
+    const response = await fetch(`${BASE_URL}/`, {
+      headers: { Authorization: `Bearer ${API_KEY}` },
+    });
+    const data = await response.json();
+    // manifest.dir should be like "/path/to/vault/.obsidian/plugins/local-rest-api"
+    // Go up 3 directories to get vault root
+    if (data.manifest?.dir) {
+      detectedManifestDir = data.manifest.dir;
+      // Only use if it looks like a valid absolute path
+      if (data.manifest.dir.startsWith("/") && data.manifest.dir.includes(".obsidian")) {
+        cachedVaultPath = resolve(data.manifest.dir, "../../..");
+        return cachedVaultPath;
+      }
+    }
+  } catch {
+    // Fall through - will return null
+  }
+
+  return null;
+}
+
+export function getDetectedManifestDir(): string | null {
+  return detectedManifestDir;
 }

@@ -1,6 +1,8 @@
-import { makeRequest, type ToolRegistry } from "$/shared";
+import { makeRequest, getVaultPath, getDetectedManifestDir, type ToolRegistry } from "$/shared";
 import type { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { type } from "arktype";
+import { stat } from "fs/promises";
+import { join } from "path";
 import { LocalRestAPI } from "shared";
 
 export function registerLocalRestApiTools(tools: ToolRegistry, server: Server) {
@@ -283,10 +285,53 @@ export function registerLocalRestApiTools(tools: ToolRegistry, server: Server) {
     size: number;
   }
 
-  async function getFileMetadata(filename: string): Promise<FileWithMeta | null> {
+  // Lenient type for file stats - only validates what we need
+  const FileStatResponse = type({
+    stat: {
+      ctime: "number",
+      mtime: "number",
+      size: "number",
+    },
+    "+": "delete",  // Ignore all other fields (frontmatter, content, etc.)
+  });
+
+  // Process items in batches to avoid overwhelming the API
+  async function batchProcess<T, R>(
+    items: T[],
+    fn: (item: T) => Promise<R>,
+    batchSize: number = 50
+  ): Promise<R[]> {
+    const results: R[] = [];
+    for (let i = 0; i < items.length; i += batchSize) {
+      const batch = items.slice(i, i + batchSize);
+      const batchResults = await Promise.all(batch.map(fn));
+      results.push(...batchResults);
+    }
+    return results;
+  }
+
+  async function getFileMetadata(filename: string): Promise<FileWithMeta> {
+    // Try direct file system access first (much faster)
+    const vaultPath = await getVaultPath();
+    if (vaultPath) {
+      try {
+        const fullPath = join(vaultPath, filename);
+        const stats = await stat(fullPath);
+        return {
+          filename,
+          mtime: stats.mtimeMs,
+          ctime: stats.ctimeMs,
+          size: stats.size,
+        };
+      } catch {
+        // Fall through to API fallback
+      }
+    }
+
+    // Fallback to REST API
     try {
       const data = await makeRequest(
-        LocalRestAPI.ApiNoteJson,
+        FileStatResponse,
         `/vault/${encodePathSegments(filename)}`,
         {
           headers: { Accept: "application/vnd.olrapi.note+json" },
@@ -298,9 +343,9 @@ export function registerLocalRestApiTools(tools: ToolRegistry, server: Server) {
         ctime: data.stat.ctime,
         size: data.stat.size,
       };
-    } catch {
-      // File might not support JSON format (e.g., images)
-      return { filename, mtime: 0, ctime: 0, size: 0 };
+    } catch (error) {
+      const errMsg = error instanceof Error ? error.message : String(error);
+      return { filename, mtime: 0, ctime: 0, size: 0, error: errMsg } as FileWithMeta;
     }
   }
 
@@ -339,8 +384,10 @@ export function registerLocalRestApiTools(tools: ToolRegistry, server: Server) {
       }
 
       if (args.sortBy) {
-        const filesWithMeta = await Promise.all(
-          files.map((f: string) => getFileMetadata(f))
+        const filesWithMeta = await batchProcess(
+          files,
+          (f: string) => getFileMetadata(f),
+          50
         );
 
         const sortOrder = args.sortOrder || "desc";
@@ -376,10 +423,11 @@ export function registerLocalRestApiTools(tools: ToolRegistry, server: Server) {
         "limit?": "number",
         "excludeFolders?": "string[]",
         "includeFolders?": "string[]",
-        "pattern?": "string",
+        "pattern?": "string | string[]",
+        "debug?": "boolean",
       },
     }).describe(
-      "Get the most recently modified files across the vault. Returns path, mtime (ISO 8601), and size. Default limit is 20.",
+      "Get the most recent files across the vault (sorted by max of ctime/mtime). Returns path, mtime, ctime (ISO 8601), and size. Default limit is 20. Pattern can be a single glob or array of globs.",
     ),
     async ({ arguments: args }) => {
       const limit = args.limit || 20;
@@ -389,8 +437,12 @@ export function registerLocalRestApiTools(tools: ToolRegistry, server: Server) {
       if (args.includeFolders && args.includeFolders.length > 0) {
         const allFiles: string[] = [];
         for (const folder of args.includeFolders) {
-          const folderFiles = await listFilesRecursively(folder);
-          allFiles.push(...folderFiles);
+          try {
+            const folderFiles = await listFilesRecursively(folder);
+            allFiles.push(...folderFiles);
+          } catch {
+            // Folder doesn't exist, skip it gracefully
+          }
         }
         files = allFiles;
       } else {
@@ -406,21 +458,89 @@ export function registerLocalRestApiTools(tools: ToolRegistry, server: Server) {
         );
       }
 
-      // Apply pattern filter
+      // Apply pattern filter (supports single pattern or array of patterns)
       if (args.pattern) {
-        files = files.filter((f: string) => matchesPattern(f, args.pattern!));
+        const patterns = Array.isArray(args.pattern) ? args.pattern : [args.pattern];
+        files = files.filter((f: string) =>
+          patterns.some((p: string) => matchesPattern(f, p))
+        );
       }
 
-      // Fetch metadata and sort by mtime desc
-      const filesWithMeta = await Promise.all(
-        files.map((f: string) => getFileMetadata(f))
+      // Debug: show enumerated files before metadata fetch
+      if (args.debug) {
+        const startTime = Date.now();
+        const detectedVaultPath = await getVaultPath();
+
+        const debugInfo = {
+          vaultPath: detectedVaultPath,
+          manifestDir: getDetectedManifestDir(),
+          usingDirectFS: !!detectedVaultPath,
+          totalFilesEnumerated: files.length,
+          sampleFiles: files.slice(0, 20),
+        };
+
+        // Fetch metadata and sort by most recent time (max of ctime/mtime)
+        const metadataStartTime = Date.now();
+        const filesWithMeta = await batchProcess(
+          files,
+          (f: string) => getFileMetadata(f),
+          50
+        );
+        const metadataTime = Date.now() - metadataStartTime;
+
+        // Find files with zero timestamps (failed metadata)
+        const failedFiles = filesWithMeta.filter(f => f.mtime === 0 && f.ctime === 0);
+
+        filesWithMeta.sort((a, b) => {
+          const aRecent = Math.max(a.mtime, a.ctime);
+          const bRecent = Math.max(b.mtime, b.ctime);
+          return bRecent - aRecent;
+        });
+
+        const results = filesWithMeta.slice(0, limit).map((f) => ({
+          path: f.filename,
+          mtime: f.mtime,
+          ctime: f.ctime,
+          size: f.size,
+        }));
+
+        const totalTime = Date.now() - startTime;
+
+        return {
+          content: [{ type: "text", text: JSON.stringify({
+            timing: {
+              totalMs: totalTime,
+              metadataFetchMs: metadataTime,
+              filesPerSecond: Math.round(files.length / (metadataTime / 1000)),
+            },
+            ...debugInfo,
+            failedMetadataCount: failedFiles.length,
+            failedFilesWithErrors: failedFiles.slice(0, 5).map(f => ({
+              file: f.filename,
+              error: (f as any).error
+            })),
+            results,
+          }, null, 2) }],
+        };
+      }
+
+      // Fetch metadata and sort by most recent time (max of ctime/mtime)
+      const filesWithMeta = await batchProcess(
+        files,
+        (f: string) => getFileMetadata(f),
+        50
       );
-      filesWithMeta.sort((a, b) => b.mtime - a.mtime);
+      filesWithMeta.sort((a, b) => {
+        const aRecent = Math.max(a.mtime, a.ctime);
+        const bRecent = Math.max(b.mtime, b.ctime);
+        return bRecent - aRecent;
+      });
 
       // Take top N and format response
       const results = filesWithMeta.slice(0, limit).map((f) => ({
         path: f.filename,
         mtime: new Date(f.mtime).toISOString(),
+        ctime: new Date(f.ctime).toISOString(),
         size: f.size,
       }));
 
