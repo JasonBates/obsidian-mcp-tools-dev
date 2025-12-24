@@ -214,8 +214,9 @@ export function registerLocalRestApiTools(tools: ToolRegistry, server: Server) {
       arguments: {
         query: "string",
         "contextLength?": "number",
+        "limit?": "number",
       },
-    }).describe("Search for documents matching a text query."),
+    }).describe("Search for documents matching a text query. Returns file paths only."),
     async ({ arguments: args }) => {
       const query = new URLSearchParams({
         query: args.query,
@@ -234,8 +235,11 @@ export function registerLocalRestApiTools(tools: ToolRegistry, server: Server) {
         },
       );
 
+      const results = args.limit ? data.slice(0, args.limit) : data;
+      const filePaths = results.map((r: { filename: string }) => r.filename);
+
       return {
-        content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
+        content: [{ type: "text", text: JSON.stringify(filePaths, null, 2) }],
       };
     },
   );
@@ -293,6 +297,42 @@ export function registerLocalRestApiTools(tools: ToolRegistry, server: Server) {
               typeof data === "string" ? data : JSON.stringify(data, null, 2),
           },
         ],
+      };
+    },
+  );
+
+  // GET Multiple Vault Files Content
+  tools.register(
+    type({
+      name: '"get_vault_files"',
+      arguments: {
+        filenames: "string[]",
+      },
+    }).describe(
+      "Get the content of multiple files from your vault in a single request. Returns an array of objects with filename and content.",
+    ),
+    async ({ arguments: args }) => {
+      const results = await Promise.all(
+        args.filenames.map(async (filename: string) => {
+          try {
+            const content = await makeRequest(
+              LocalRestAPI.ApiContentResponse,
+              `/vault/${encodeURIComponent(filename)}`,
+              {
+                headers: { Accept: "text/markdown" },
+              },
+            );
+            return { filename, content };
+          } catch (error) {
+            return {
+              filename,
+              error: error instanceof Error ? error.message : "Failed to read file",
+            };
+          }
+        }),
+      );
+      return {
+        content: [{ type: "text", text: JSON.stringify(results, null, 2) }],
       };
     },
   );
