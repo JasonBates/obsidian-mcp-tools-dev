@@ -245,10 +245,15 @@ export function registerLocalRestApiTools(tools: ToolRegistry, server: Server) {
   );
 
   // GET Vault Files or Directories List
+  function encodePathSegments(path: string): string {
+    return path.split("/").map(segment => encodeURIComponent(segment)).join("/");
+  }
+
   async function listFilesRecursively(dir: string): Promise<string[]> {
+    const encodedDir = dir ? encodePathSegments(dir) + "/" : "";
     const { files } = await makeRequest(
       LocalRestAPI.ApiVaultDirectoryResponse,
-      `/vault/${dir ? dir + "/" : ""}`,
+      `/vault/${encodedDir}`,
     );
 
     const results: string[] = [];
@@ -288,9 +293,10 @@ export function registerLocalRestApiTools(tools: ToolRegistry, server: Server) {
       if (args.recursive) {
         files = await listFilesRecursively(args.directory || "");
       } else {
+        const encodedDir = args.directory ? encodePathSegments(args.directory) + "/" : "";
         const data = await makeRequest(
           LocalRestAPI.ApiVaultDirectoryResponse,
-          `/vault/${args.directory ? args.directory + "/" : ""}`,
+          `/vault/${encodedDir}`,
         );
         files = data.files.map((f: string) =>
           args.directory ? `${args.directory}/${f}` : f
