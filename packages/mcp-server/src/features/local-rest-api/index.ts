@@ -276,6 +276,34 @@ export function registerLocalRestApiTools(tools: ToolRegistry, server: Server) {
     return regex.test(filename.split("/").pop() || "");
   }
 
+  interface FileWithMeta {
+    filename: string;
+    mtime: number;
+    ctime: number;
+    size: number;
+  }
+
+  async function getFileMetadata(filename: string): Promise<FileWithMeta | null> {
+    try {
+      const data = await makeRequest(
+        LocalRestAPI.ApiNoteJson,
+        `/vault/${encodePathSegments(filename)}`,
+        {
+          headers: { Accept: "application/vnd.olrapi.note+json" },
+        },
+      );
+      return {
+        filename,
+        mtime: data.stat.mtime,
+        ctime: data.stat.ctime,
+        size: data.stat.size,
+      };
+    } catch {
+      // File might not support JSON format (e.g., images)
+      return { filename, mtime: 0, ctime: 0, size: 0 };
+    }
+  }
+
   tools.register(
     type({
       name: '"list_vault_files"',
@@ -283,9 +311,12 @@ export function registerLocalRestApiTools(tools: ToolRegistry, server: Server) {
         "directory?": "string",
         "recursive?": "boolean",
         "pattern?": "string",
+        "sortBy?": '"mtime" | "ctime" | "size" | "name"',
+        "sortOrder?": '"asc" | "desc"',
+        "limit?": "number",
       },
     }).describe(
-      "List files in the vault. Use recursive=true to include subdirectories. Use pattern to filter by glob (e.g., '*.md').",
+      "List files in the vault. Use recursive=true for subdirectories, pattern for glob filtering, sortBy/sortOrder for sorting (mtime, ctime, size, name), and limit to cap results.",
     ),
     async ({ arguments: args }) => {
       let files: string[];
@@ -298,13 +329,37 @@ export function registerLocalRestApiTools(tools: ToolRegistry, server: Server) {
           LocalRestAPI.ApiVaultDirectoryResponse,
           `/vault/${encodedDir}`,
         );
-        files = data.files.map((f: string) =>
-          args.directory ? `${args.directory}/${f}` : f
-        );
+        files = data.files
+          .filter((f: string) => !f.endsWith("/"))
+          .map((f: string) => args.directory ? `${args.directory}/${f}` : f);
       }
 
       if (args.pattern) {
         files = files.filter((f: string) => matchesPattern(f, args.pattern!));
+      }
+
+      if (args.sortBy) {
+        const filesWithMeta = await Promise.all(
+          files.map((f: string) => getFileMetadata(f))
+        );
+
+        const sortOrder = args.sortOrder || "desc";
+        filesWithMeta.sort((a, b) => {
+          let cmp: number;
+          if (args.sortBy === "name") {
+            cmp = a.filename.localeCompare(b.filename);
+          } else {
+            cmp = (a[args.sortBy as "mtime" | "ctime" | "size"] || 0) -
+                  (b[args.sortBy as "mtime" | "ctime" | "size"] || 0);
+          }
+          return sortOrder === "desc" ? -cmp : cmp;
+        });
+
+        files = filesWithMeta.map((f: FileWithMeta) => f.filename);
+      }
+
+      if (args.limit) {
+        files = files.slice(0, args.limit);
       }
 
       return {
