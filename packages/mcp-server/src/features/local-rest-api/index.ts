@@ -5,6 +5,40 @@ import { stat } from "fs/promises";
 import { join } from "path";
 import { LocalRestAPI } from "shared";
 
+/**
+ * Parse markdown content and resolve a partial heading name to its full hierarchical path.
+ * Returns the full path if found, or null if not found.
+ */
+function resolveHeadingPath(
+  content: string,
+  leafName: string,
+  delimiter: string,
+): string | null {
+  const lines = content.split("\n");
+  const stack: string[] = [];
+  const matches: string[] = [];
+
+  for (const line of lines) {
+    // Match markdown headings (# Heading, ## Heading, etc.)
+    const match = line.match(/^(#{1,6})\s+(.+)$/);
+    if (match) {
+      const level = match[1].length;
+      const headingText = match[2].trim();
+
+      // Maintain stack based on heading level
+      stack.length = level - 1;
+      stack[level - 1] = headingText;
+
+      if (headingText === leafName) {
+        matches.push(stack.slice(0, level).join(delimiter));
+      }
+    }
+  }
+
+  // Return first match, or null if not found
+  return matches.length > 0 ? matches[0] : null;
+}
+
 export function registerLocalRestApiTools(tools: ToolRegistry, server: Server) {
   // GET Status
   tools.register(
@@ -97,11 +131,42 @@ export function registerLocalRestApiTools(tools: ToolRegistry, server: Server) {
       "Insert or modify content in the currently-open note relative to a heading, block reference, or frontmatter field.",
     ),
     async ({ arguments: args }) => {
+      const targetDelimiter = args.targetDelimiter || "::";
+      let resolvedTarget = args.target;
+
+      // If targeting a heading without a full path, resolve it
+      if (
+        args.targetType === "heading" &&
+        !args.target.includes(targetDelimiter)
+      ) {
+        // Fetch the active file content to parse headings
+        const fileContent = await makeRequest(
+          LocalRestAPI.ApiContentResponse,
+          "/active/",
+          { headers: { Accept: "text/markdown" } },
+        );
+
+        const fullPath = resolveHeadingPath(
+          fileContent,
+          args.target,
+          targetDelimiter,
+        );
+        if (fullPath) {
+          resolvedTarget = fullPath;
+        }
+      }
+
+      // Ensure appended content ends with newlines for clean separation from next section
+      let content = args.content;
+      if (args.operation === "append" && !content.endsWith("\n")) {
+        content = content + "\n\n";
+      }
+
       const headers: Record<string, string> = {
         Operation: args.operation,
         "Target-Type": args.targetType,
-        Target: args.target,
-        "Create-Target-If-Missing": "true",
+        Target: resolvedTarget,
+        "Create-Target-If-Missing": String(args.createTargetIfMissing ?? true),
       };
 
       if (args.targetDelimiter) {
@@ -120,7 +185,7 @@ export function registerLocalRestApiTools(tools: ToolRegistry, server: Server) {
         {
           method: "PATCH",
           headers,
-          body: args.content,
+          body: content,
         },
       );
       return {
@@ -678,11 +743,42 @@ export function registerLocalRestApiTools(tools: ToolRegistry, server: Server) {
       "Insert or modify content in a file relative to a heading, block reference, or frontmatter field.",
     ),
     async ({ arguments: args }) => {
+      const targetDelimiter = args.targetDelimiter || "::";
+      let resolvedTarget = args.target;
+
+      // If targeting a heading without a full path, resolve it
+      if (
+        args.targetType === "heading" &&
+        !args.target.includes(targetDelimiter)
+      ) {
+        // Fetch the file content to parse headings
+        const fileContent = await makeRequest(
+          LocalRestAPI.ApiContentResponse,
+          `/vault/${encodeURIComponent(args.filename)}`,
+          { headers: { Accept: "text/markdown" } },
+        );
+
+        const fullPath = resolveHeadingPath(
+          fileContent,
+          args.target,
+          targetDelimiter,
+        );
+        if (fullPath) {
+          resolvedTarget = fullPath;
+        }
+      }
+
+      // Ensure appended content ends with newlines for clean separation from next section
+      let content = args.content;
+      if (args.operation === "append" && !content.endsWith("\n")) {
+        content = content + "\n\n";
+      }
+
       const headers: HeadersInit = {
         Operation: args.operation,
         "Target-Type": args.targetType,
-        Target: args.target,
-        "Create-Target-If-Missing": "true",
+        Target: resolvedTarget,
+        "Create-Target-If-Missing": String(args.createTargetIfMissing ?? true),
       };
 
       if (args.targetDelimiter) {
@@ -701,7 +797,7 @@ export function registerLocalRestApiTools(tools: ToolRegistry, server: Server) {
         {
           method: "PATCH",
           headers,
-          body: args.content,
+          body: content,
         },
       );
 

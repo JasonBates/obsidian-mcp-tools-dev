@@ -228,6 +228,9 @@ export const ApiPatchParameters = type({
   "contentType?": type("'text/markdown' | 'application/json'").describe(
     "Format of the content - use application/json for structured data like table rows or frontmatter values",
   ),
+  "createTargetIfMissing?": type("boolean").describe(
+    "Whether to create the target heading/block if it doesn't exist (default: true). Set to false to get an error instead of creating new targets.",
+  ),
 });
 
 /**
