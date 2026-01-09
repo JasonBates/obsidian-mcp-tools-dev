@@ -1,10 +1,12 @@
-# MCP Tools for Obsidian
+# MCP Tools for Obsidian (Fork)
+
+> **This is a personal fork** of [jacksteamdev/obsidian-mcp-tools](https://github.com/jacksteamdev/obsidian-mcp-tools) with additional features and bug fixes. See [Fork Enhancements](#fork-enhancements) below.
 
 [![GitHub release (latest by date)](https://img.shields.io/github/v/release/jacksteamdev/obsidian-mcp-tools)](https://github.com/jacksteamdev/obsidian-mcp-tools/releases/latest)
 [![Build status](https://img.shields.io/github/actions/workflow/status/jacksteamdev/obsidian-mcp-tools/release.yml)](https://github.com/jacksteamdev/obsidian-mcp-tools/actions)
 [![License](https://img.shields.io/github/license/jacksteamdev/obsidian-mcp-tools)](LICENSE)
 
-[Features](#features) | [Installation](#installation) | [Configuration](#configuration) | [Troubleshooting](#troubleshooting) | [Security](#security) | [Development](#development) | [Support](#support)
+[Fork Enhancements](#fork-enhancements) | [Features](#features) | [Installation](#installation) | [Configuration](#configuration) | [Troubleshooting](#troubleshooting) | [Security](#security) | [Development](#development) | [Support](#support)
 
 > **🔄 Seeking Project Maintainers**
 > 
@@ -33,6 +35,39 @@ When connected to an MCP client like Claude Desktop, this plugin enables:
 - **Template Integration**: Execute Obsidian templates through AI interactions, with dynamic parameters and content generation [^6]
 
 All features require an MCP-compatible client like Claude Desktop, as this plugin provides the server component that enables these integrations. The plugin does not modify Obsidian's functionality directly - instead, it creates a secure bridge that allows AI applications to work with your vault in powerful ways.
+
+## Fork Enhancements
+
+This fork includes the following improvements over the upstream repository:
+
+### New Tools
+
+- **`get_vault_files`** - Batch fetch multiple files in a single request, reducing round-trips for multi-file operations
+- **`get_recent_files`** - Get recently modified files across the vault, sorted by modification time with optional glob pattern filtering
+- **`link_to_mocs`** - Automatically link notes to semantically relevant Maps of Content (MoCs) using Smart Connections
+
+### Enhanced Tools
+
+- **`list_vault_files`**
+  - Added `recursive` option for listing files in subdirectories
+  - Added `pattern` option for glob-based filtering (e.g., `*.md`, `Projects/*.md`)
+  - Added `sortBy` option (name, mtime, ctime, size) and `sortOrder` (asc, desc)
+  - Added `limit` option to cap results
+  - Fixed Unicode emoji handling in file paths
+  - Direct filesystem access for faster file stats
+
+- **`search_vault_simple`** - Improved to return file paths only (reduced response size)
+
+- **`patch_vault_file` / `patch_active_file`**
+  - **Fixed nested heading targeting**: Partial heading names (e.g., "Section One") now resolve to full hierarchical paths (e.g., "Main Heading::Section One") automatically
+  - **Auto-newline safeguard**: Appended content that doesn't end with a newline automatically gets `\n\n` added to prevent broken markdown
+  - **`createTargetIfMissing` parameter**: Control whether missing targets are created (default: true) or return an error
+  - Clarified documentation to distinguish markdown headings from wiki-links
+
+### Bug Fixes
+
+- Fixed `patch_vault_file` creating new headings at EOF instead of finding existing nested headings
+- Fixed Unicode emoji characters breaking file path handling in `list_vault_files`
 
 ## Prerequisites
 
