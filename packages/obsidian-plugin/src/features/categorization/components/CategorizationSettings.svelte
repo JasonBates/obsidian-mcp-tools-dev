@@ -51,9 +51,8 @@
     <div class="setting-item-info">
       <div class="setting-item-name">Usage</div>
       <div class="setting-item-description">
-        Press <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>Cmd</kbd>+<kbd>C</kbd> (Mac) or
-        <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>Ctrl</kbd>+<kbd>C</kbd> (Windows) to
-        categorize the active note. You can also use the command palette.
+        Press <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>C</kbd> to categorize the
+        active note. You can also use the command palette.
       </div>
     </div>
   </div>
