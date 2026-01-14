@@ -11,6 +11,7 @@ import {
   type PromptArgAccessor,
   type SearchResponse,
 } from "shared";
+import { setup as setupCategorization } from "./features/categorization";
 import { setup as setupCore } from "./features/core";
 import { setup as setupMcpServerInstall } from "./features/mcp-server-install";
 import {
@@ -38,6 +39,7 @@ export default class McpToolsPlugin extends Plugin {
     // Initialize features in order
     await setupCore(this);
     await setupMcpServerInstall(this);
+    await setupCategorization(this);
 
     // Check for required dependencies
     lastValueFrom(loadLocalRestAPI(this)).then((localRestApi) => {

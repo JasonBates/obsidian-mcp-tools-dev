@@ -2,6 +2,7 @@ import { logger, type ToolRegistry, ToolRegistryClass } from "$/shared";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { registerFetchTool } from "../fetch";
+import { registerLlmCategorizationTools } from "../llm-categorization";
 import { registerLocalRestApiTools } from "../local-rest-api";
 import { registerMocLinkingTools } from "../moc-linking";
 import { setupObsidianPrompts } from "../prompts";
@@ -49,6 +50,7 @@ export class ObsidianMcpServer {
     setupObsidianPrompts(this.server);
 
     registerFetchTool(this.tools, this.server);
+    registerLlmCategorizationTools(this.tools);
     registerLocalRestApiTools(this.tools, this.server);
     registerMocLinkingTools(this.tools);
     registerSmartConnectionsTools(this.tools);

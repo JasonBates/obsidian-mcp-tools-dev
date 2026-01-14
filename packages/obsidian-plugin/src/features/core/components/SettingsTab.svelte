@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { FeatureSettings as CategorizationSettings } from "src/features/categorization";
   import { FeatureSettings as McpServerInstallSettings } from "src/features/mcp-server-install";
   import type McpServerPlugin from "src/main";
 
@@ -7,4 +8,5 @@
 
 <div class="settings-container">
   <McpServerInstallSettings {plugin} />
+  <CategorizationSettings {plugin} />
 </div>

@@ -21,6 +21,7 @@
     "acorn": "^8.14.0",
     "acorn-walk": "^8.3.4",
     "arktype": "2.0.0-rc.30",
+    "openai": "^4.77.0",
     "radash": "^12.1.0",
     "shared": "workspace:*",
     "turndown": "^7.2.0",

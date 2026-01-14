@@ -1,6 +1,7 @@
 declare module "obsidian" {
   interface McpToolsPluginSettings {
     version?: string;
+    openaiApiKey?: string;
   }
 
   interface Plugin {
