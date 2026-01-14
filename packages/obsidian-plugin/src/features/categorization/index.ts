@@ -140,7 +140,7 @@ export async function setup(plugin: McpToolsPlugin): Promise<void> {
   plugin.addCommand({
     id: "categorize-current-note",
     name: "Categorize current note with MoCs",
-    hotkeys: [{ modifiers: ["Ctrl", "Alt"], key: "c" }],
+    hotkeys: [{ modifiers: ["Ctrl", "Alt"], key: "v" }],
     callback: () => categorizeCurrentNote(plugin),
   });
 
