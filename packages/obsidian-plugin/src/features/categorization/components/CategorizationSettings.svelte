@@ -1,15 +1,22 @@
 <script lang="ts">
   import type McpToolsPlugin from "$/main";
-  import { onMount } from "svelte";
+  import { onDestroy, onMount } from "svelte";
 
   export let plugin: McpToolsPlugin;
 
   let apiKey = "";
   let saved = false;
+  let savedTimeout: ReturnType<typeof setTimeout> | null = null;
 
   onMount(async () => {
     const settings = await plugin.loadData();
     apiKey = settings?.openaiApiKey ?? "";
+  });
+
+  onDestroy(() => {
+    if (savedTimeout) {
+      clearTimeout(savedTimeout);
+    }
   });
 
   async function saveApiKey() {
@@ -17,7 +24,8 @@
     settings.openaiApiKey = apiKey;
     await plugin.saveData(settings);
     saved = true;
-    setTimeout(() => (saved = false), 2000);
+    if (savedTimeout) clearTimeout(savedTimeout);
+    savedTimeout = setTimeout(() => (saved = false), 2000);
   }
 </script>
 
