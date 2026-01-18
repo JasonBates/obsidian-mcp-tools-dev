@@ -18,7 +18,7 @@ export function registerCanvasScreenshotTools(tools: ToolRegistry) {
         ),
       },
     }).describe(
-      "Capture a screenshot of an Obsidian canvas file. Returns the image as base64 PNG. The canvas will be automatically opened if not already visible, and zoomed to fit all content.",
+      "Capture a screenshot of an Obsidian canvas file. Saves the PNG to a temp file and returns the file path. Use the Read tool to view the image. The canvas will be automatically opened if not already visible, and zoomed to fit all content.",
     ),
     async ({ arguments: args }) => {
       const response = await makeRequest(
@@ -60,11 +60,6 @@ export function registerCanvasScreenshotTools(tools: ToolRegistry) {
 
       return {
         content: [
-          {
-            type: "image",
-            data: response.image,
-            mimeType: response.mimeType,
-          },
           {
             type: "text",
             text: `Screenshot saved to: ${tempPath}`,
