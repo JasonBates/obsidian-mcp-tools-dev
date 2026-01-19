@@ -3,7 +3,7 @@
   import { FULL_LOGGER_FILENAME, loadDependenciesArray } from "$/shared";
   import { Notice } from "obsidian";
   import { dirname } from "path";
-  import { onDestroy, onMount } from "svelte";
+  import { onMount } from "svelte";
   import {
     removeFromClaudeConfig,
     updateClaudeConfig,
@@ -17,13 +17,8 @@
   export let plugin: McpToolsPlugin;
 
   // Dependencies and API key status
+  // Note: Svelte's $deps auto-subscription handles cleanup automatically
   const deps = loadDependenciesArray(plugin);
-
-  // Clean up the RxJS subscription when component is destroyed
-  const depsSubscription = deps.subscribe(() => {});
-  onDestroy(() => {
-    depsSubscription.unsubscribe();
-  });
 
   // Installation status
   let status: InstallationStatus = {

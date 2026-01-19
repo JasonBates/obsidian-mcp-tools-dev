@@ -3,7 +3,7 @@ import type { Request, Response } from "express";
 import { Notice, TFile } from "obsidian";
 // Use AC's bundled html-to-image which properly captures SVG properties
 // The npm version caches style properties from document.documentElement, missing fill/stroke
-import { toPng } from "./html-to-image-ac";
+import { toPng, clearCaches } from "./html-to-image-ac";
 import { LocalRestAPI } from "shared";
 import type McpToolsPlugin from "../../main";
 import { logger } from "../../shared/logger";
@@ -617,4 +617,13 @@ export async function handleCanvasScreenshot(
  */
 export async function setup(plugin: McpToolsPlugin): Promise<void> {
   logger.info("Canvas screenshot feature loaded");
+}
+
+/**
+ * Cleanup function to clear html-to-image caches
+ * Should be called from plugin's onunload()
+ */
+export function cleanup(): void {
+  clearCaches();
+  logger.info("Canvas screenshot caches cleared");
 }

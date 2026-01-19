@@ -756,4 +756,19 @@ async function toPng(node, options = {}) {
 }
 
 
-export { toPng };
+/**
+ * Clear all internal caches to prevent memory leaks.
+ * Should be called when the plugin is unloaded.
+ */
+function clearCaches() {
+  // Clear resource data URL cache
+  for (const key in cache) {
+    delete cache[key];
+  }
+  // Clear CSS fetch cache
+  for (const key in cssFetchCache) {
+    delete cssFetchCache[key];
+  }
+}
+
+export { toPng, clearCaches };

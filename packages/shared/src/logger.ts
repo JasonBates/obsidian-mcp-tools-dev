@@ -76,16 +76,20 @@ export function createLogger(inputConfig: InputLoggerConfig) {
   let config: FullLoggerConfig = loggerConfigMorph.assert(inputConfig);
   let logMeta: Record<string, unknown> = {};
 
-  const queue: Promise<void>[] = [];
+  let queue: Promise<void>[] = [];
   const log = (level: LogLevel, message: unknown, meta?: typeof logMeta) => {
     if (!config.levels.includes(level)) return;
     ensureDirSync(dirname(getLogFilePath(config.appName, config.filename)));
-    queue.push(
-      appendFile(
-        config.filename,
-        formatMessage(level, message, { ...logMeta, ...(meta ?? {}) }),
-      ),
+    const promise = appendFile(
+      config.filename,
+      formatMessage(level, message, { ...logMeta, ...(meta ?? {}) }),
     );
+    queue.push(promise);
+    // Clean up resolved promises to prevent memory leak
+    promise.finally(() => {
+      const index = queue.indexOf(promise);
+      if (index > -1) queue.splice(index, 1);
+    });
   };
 
   const debug = (message: unknown, meta?: typeof logMeta) =>
@@ -106,7 +110,8 @@ export function createLogger(inputConfig: InputLoggerConfig) {
     error,
     fatal,
     flush() {
-      return Promise.all(queue);
+      // Return copy of current queue - promises will self-remove when resolved
+      return Promise.all([...queue]);
     },
     get config(): FullLoggerConfig {
       return { ...config };

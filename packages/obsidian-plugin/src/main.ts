@@ -12,6 +12,7 @@ import {
   type SearchResponse,
 } from "shared";
 import {
+  cleanup as cleanupCanvasScreenshot,
   handleCanvasScreenshot,
   setup as setupCanvasScreenshot,
 } from "./features/canvas-screenshot";
@@ -263,6 +264,9 @@ export default class McpToolsPlugin extends Plugin {
       subscription.unsubscribe();
     }
     this.subscriptions = [];
+
+    // Clean up canvas screenshot caches to prevent memory leaks
+    cleanupCanvasScreenshot();
 
     // Reset state for potential re-enable
     this.endpointsRegistered = false;
