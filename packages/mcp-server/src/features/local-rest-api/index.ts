@@ -157,7 +157,6 @@ export function registerLocalRestApiTools(tools: ToolRegistry, server: Server) {
 
       // If targeting a heading, resolve partial paths to full hierarchical paths
       if (args.targetType === "heading") {
-        // Fetch the active file content to parse headings
         const fileContent = await makeRequest(
           LocalRestAPI.ApiContentResponse,
           "/active/",
@@ -174,17 +173,18 @@ export function registerLocalRestApiTools(tools: ToolRegistry, server: Server) {
         }
       }
 
-      // Ensure proper newline handling for clean markdown formatting
+      // Trailing newline handling for clean markdown formatting.
+      // The plugin handles blank-line-after-heading positioning and
+      // creates missing headings as H2 (patched from default H1).
+      // Skip all adjustments for frontmatter — trailing newlines cause
+      // YAML block scalar wrapping (status: |\n  value) instead of inline values.
       let content = args.content;
-      if (args.operation === "append" && !content.endsWith("\n")) {
-        // Append: add trailing newlines to separate from next section
-        content = content + "\n\n";
-      } else if (args.operation === "prepend" && !content.endsWith("\n")) {
-        // Prepend: add trailing newline to separate from existing content
-        content = content + "\n";
-      } else if (args.operation === "replace" && !content.endsWith("\n")) {
-        // Replace: add trailing newline to separate from next section
-        content = content + "\n";
+      if (args.targetType !== "frontmatter") {
+        if (args.operation === "append" && !content.endsWith("\n")) {
+          content = content + "\n\n";
+        } else if (!content.endsWith("\n")) {
+          content = content + "\n";
+        }
       }
 
       const headers: Record<string, string> = {
@@ -773,7 +773,6 @@ export function registerLocalRestApiTools(tools: ToolRegistry, server: Server) {
 
       // If targeting a heading, resolve partial paths to full hierarchical paths
       if (args.targetType === "heading") {
-        // Fetch the file content to parse headings
         const fileContent = await makeRequest(
           LocalRestAPI.ApiContentResponse,
           `/vault/${encodeURIComponent(args.filename)}`,
@@ -790,17 +789,14 @@ export function registerLocalRestApiTools(tools: ToolRegistry, server: Server) {
         }
       }
 
-      // Ensure proper newline handling for clean markdown formatting
+      // Trailing newline handling — see comment in patch_active_file handler.
       let content = args.content;
-      if (args.operation === "append" && !content.endsWith("\n")) {
-        // Append: add trailing newlines to separate from next section
-        content = content + "\n\n";
-      } else if (args.operation === "prepend" && !content.endsWith("\n")) {
-        // Prepend: add trailing newline to separate from existing content
-        content = content + "\n";
-      } else if (args.operation === "replace" && !content.endsWith("\n")) {
-        // Replace: add trailing newline to separate from next section
-        content = content + "\n";
+      if (args.targetType !== "frontmatter") {
+        if (args.operation === "append" && !content.endsWith("\n")) {
+          content = content + "\n\n";
+        } else if (!content.endsWith("\n")) {
+          content = content + "\n";
+        }
       }
 
       const headers: HeadersInit = {
