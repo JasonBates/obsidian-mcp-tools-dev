@@ -190,7 +190,7 @@ export function registerLocalRestApiTools(tools: ToolRegistry, server: Server) {
       const headers: Record<string, string> = {
         Operation: args.operation,
         "Target-Type": args.targetType,
-        Target: resolvedTarget,
+        Target: encodeURIComponent(resolvedTarget),
         "Create-Target-If-Missing": String(args.createTargetIfMissing ?? true),
       };
 
@@ -802,7 +802,7 @@ export function registerLocalRestApiTools(tools: ToolRegistry, server: Server) {
       const headers: HeadersInit = {
         Operation: args.operation,
         "Target-Type": args.targetType,
-        Target: resolvedTarget,
+        Target: encodeURIComponent(resolvedTarget),
         "Create-Target-If-Missing": String(args.createTargetIfMissing ?? true),
       };
 
