@@ -37,7 +37,7 @@ obsidian-mcp-tools-dev/
 │   │
 │   └── test-site/               # SvelteKit development/testing app
 │
-├── bin/                         # Compiled binaries (gitignored)
+├── bin/                         # `dev` watch binary only (gitignored); `build` outputs to packages/mcp-server/dist/
 ├── dist/                        # Distribution files
 ├── main.js                      # Compiled plugin bundle
 └── manifest.json                # Obsidian plugin manifest
@@ -92,7 +92,6 @@ cd packages/obsidian-plugin && bun run link <vault-config-path>
 - `arktype` - Type validation
 - `obsidian` - Obsidian API (plugin)
 - `svelte` - UI components (plugin)
-- `fastmcp` concepts via SDK
 
 ## Platform Support
 Binary builds available for:
